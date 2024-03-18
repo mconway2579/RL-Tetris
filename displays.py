@@ -90,7 +90,7 @@ def crop_board(observation, display = False):
             #print(f"x = {i} -> {x}")
             if grey_masked_board[j, i] == 255:
                 reduced_image[y,x] = 255
-            grey_masked_board[j, i] = 128
+            #grey_masked_board[j, i] = 128
 
     #cv2.imshow(f"reduced_image", reduced_image)
     #cv2.imshow(f"grey_masked_board", grey_masked_board)
@@ -101,6 +101,10 @@ def crop_board(observation, display = False):
 
     reduced_image_transpose = reduced_image.transpose(2, 0, 1)
     reduced_image_tensor = torch.from_numpy(reduced_image_transpose).float()
+
+
+
+
 
     if display:
         img = reduced_image_tensor.squeeze(0).numpy()
@@ -116,11 +120,11 @@ def showboard_and_weight(observation, model_outputs = None, extra_text = []):
         output_list = [f"{x:.1f}" for x in output_list[0]]
         output_str = ", ".join(output_list)
 
-    new_dimensions = (1080, 720)
+    #new_dimensions = (1080, 720)
 
     # Resize the image
-    resized_image = cv2.resize(observation, new_dimensions, interpolation=cv2.INTER_LINEAR)
-    labeled_image = put_text_on_image(resized_image, output_str, (450,300))
+    #resized_image = cv2.resize(observation, new_dimensions, interpolation=cv2.INTER_LINEAR)
+    #labeled_image = put_text_on_image(resized_image, output_str, (450,300))
     cv2.imshow('observation', observation)
     #print(output_list)
     cv2.waitKey(1)  # Wait for the specified time
@@ -176,34 +180,44 @@ def stack_boards(past_past_board, past_board, current_board, display = True):
     return image_tensor
 
 class DataAnimator:
-    def __init__(self, title="", y_label=""):
-        self.title = title
-        self.y_label = y_label
-        self.fig, self.ax = plt.subplots()
-        self.y = []
-        self.line, = self.ax.plot([], [], 'r-')  # Initialize a line plot
+    def __init__(self, titles=[]):
+        self.titles = titles
+        self.fig, self.axes = plt.subplots(1, len(titles), figsize=(19,12))
+        self.y_entries = [[] for _ in titles]
+        self.lines = []
 
-        self.ani = FuncAnimation(self.fig, self.update, frames=100000, init_func=self.init_graph, interval=1)
-        plt.show(block = False)
+        self.ani = FuncAnimation(self.fig, self.update, frames=100000, init_func=self.init_graph, interval=1000)
+        plt.show(block=False)
+
     def init_graph(self):
-        self.ax.clear()
-        self.ax.set_title(self.title)
-        self.ax.set_xlabel("episode")
-        self.ax.set_ylabel(self.y_label)
-        # Set initial plot parameters (e.g., axis limits, titles)
-        # Typically no drawing, just setting the stage.
-    def update(self, frame):
-        if len(self.y) == 0:  # Avoids errors if y is empty
-            return self.line,
-        self.ax.clear()
-        x_values = range(len(self.y))
-        self.ax.set_xlim(0, len(self.y) + 1)  # Update x limits to fit the data
-        self.ax.set_ylim(min(self.y), max(self.y)+1)  # Update y limits to fit the data
-        self.line, = self.ax.plot(x_values, self.y, 'r-')  # Redraw the line
-        return self.line,
+        if len(self.titles) == 1:
+            self.axes = [self.axes]
 
-    def add_data(self, new_y):
-        self.y.append(new_y)
+        for i, ax in enumerate(self.axes):
+            ax.clear()
+            ax.set_title(self.titles[i])
+            ax.set_xlabel("Episode")
+            # Initialize a line object for each subplot.
+            # Note that we use plot to create a line and keep its reference for updating.
+            line, = ax.plot([], [], lw=2)
+            self.lines.append(line)
+        return self.lines
+
+    def update(self, frame):
+        # Update each subplot with new y data.
+        for i, line in enumerate(self.lines):
+            y_data = self.y_entries[i]
+            x_data = range(len(y_data))
+            line.set_data(x_data, y_data)
+            self.axes[i].relim()
+            self.axes[i].autoscale_view()
+        return self.lines
+
+    def add_data(self, new_ys):
+        # Add new y data for each subplot.
+        for i, y in enumerate(new_ys):
+            if y is not None:
+                self.y_entries[i].append(y)
         plt.pause(0.05)
 
 
@@ -222,6 +236,7 @@ if __name__ == "__main__":
     total_epochs = 100
     #cr_animator = DataAnimator(title="cumulative_reward", y_label = "cr")
     #ns_animator = DataAnimator(title="num_steps", y_label="ns")
+    #animator = DataAnimator(titles = ["cumulative reward", "num steps", "loss"])
 
 
     steps_between_tupdate = 4
@@ -257,6 +272,8 @@ if __name__ == "__main__":
             #print(board.shape)
             if done:
                 env.reset()
+            #animator.add_data([random.randint(0,100), random.randint(0,100)])
+        #animator.add_data([None, None, random.randint(0,100)])
 
         #cr_animator.add_data(random.randint(0,100))
         #ns_animator.add_data(random.randint(0,100))
